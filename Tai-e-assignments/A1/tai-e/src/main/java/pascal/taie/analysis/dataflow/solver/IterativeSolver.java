@@ -37,8 +37,27 @@ class IterativeSolver<Node, Fact> extends Solver<Node, Fact> {
         throw new UnsupportedOperationException();
     }
 
+    
     @Override
     protected void doSolveBackward(CFG<Node> cfg, DataflowResult<Node, Fact> result) {
         // TODO - finish me
+        boolean changed = false;
+
+        do {
+            changed = false;
+            for(Node node : cfg) {
+                // OUT = union IN of successor
+                Fact tem = analysis.newInitialFact();
+                for(Node suc : cfg.getSuccsOf(node)) {
+                    analysis.meetInto(result.getInFact(suc), tem);
+                }
+                result.setOutFact(node, tem);
+            }
+            for(Node node : cfg) {
+                // IN = use union (OUT \ def) [check IN if change]
+                boolean trans = analysis.transferNode(node , result.getInFact(node), result.getOutFact(node));
+                changed |= trans;
+            }
+        } while (changed);
     }
 }
