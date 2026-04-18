@@ -71,18 +71,17 @@ public class LiveVariableAnalysis extends
     @Override
     public boolean transferNode(Stmt stmt, SetFact<Var> in, SetFact<Var> out) {
         // TODO - finish me
-
         SetFact<Var> temOut = out.copy();
         stmt.getDef().ifPresent(def -> {
-            if (def instanceof Var var) { // ?
+            if (def instanceof Var var) {
                 temOut.remove(var);
             }
         });
         SetFact<Var> used = new SetFact<>(
-                stmt.getUses().stream()
-                        .filter(use -> use instanceof Var)
-                        .map(use -> (Var) use)
-                        .toList()
+            stmt.getUses().stream()
+                .filter(use -> use instanceof Var)
+                .map(use -> (Var) use)
+                .toList()
         );
         SetFact<Var> temIn = used.unionWith(temOut);
         if(temIn.equals(in)) return false;
