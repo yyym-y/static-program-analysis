@@ -1,3 +1,9 @@
 {
-  "plugins": ["katex-plus"]
+  "plugins": ["katex-plus", "ancre-navigation"],
+  "pluginsConfig": {
+    "simple-page-toc": {
+      "maxDepth": 3,
+      "skipFirstH1": true
+    }
+  }
 }

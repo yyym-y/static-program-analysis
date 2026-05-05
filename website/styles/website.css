@@ -1,0 +1,14 @@
+.markdown-section li > p {
+  margin-top: 0.2em;
+  margin-bottom: 0.35em;
+}
+
+.markdown-section li .katex-display {
+  margin-top: 0.35em;
+  margin-bottom: 0.35em;
+}
+
+.markdown-section li ul,
+.markdown-section li ol {
+  margin-top: 0.25em;
+}

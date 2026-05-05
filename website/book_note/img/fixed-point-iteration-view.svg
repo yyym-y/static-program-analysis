@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="220" viewBox="0 0 900 220">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#2f4f4f"/>
+    </marker>
+    <style>
+      .box { fill:#f6f3ea; stroke:#2f4f4f; stroke-width:2; rx:12; ry:12; }
+      .text { font: 20px Arial, sans-serif; fill:#1f2937; }
+      .sub { font: 17px Arial, sans-serif; fill:#374151; }
+      .title { font: 24px Arial, sans-serif; font-weight:700; fill:#111827; }
+      .line { stroke:#2f4f4f; stroke-width:3; marker-end:url(#arrow); }
+    </style>
+  </defs>
+
+  <text x="40" y="38" class="title">Iterative algorithm as repeated application of F : V^k -&gt; V^k</text>
+
+  <rect x="40" y="80" width="140" height="70" class="box"/>
+  <text x="74" y="112" class="text">X₀</text>
+  <text x="62" y="136" class="sub">(initial fact)</text>
+
+  <rect x="230" y="80" width="140" height="70" class="box"/>
+  <text x="264" y="112" class="text">X₁</text>
+  <text x="243" y="136" class="sub">X₁ = F(X₀)</text>
+
+  <rect x="420" y="80" width="140" height="70" class="box"/>
+  <text x="454" y="112" class="text">X₂</text>
+  <text x="433" y="136" class="sub">X₂ = F(X₁)</text>
+
+  <text x="610" y="122" class="title">...</text>
+
+  <rect x="700" y="80" width="160" height="70" class="box"/>
+  <text x="744" y="112" class="text">Xᵢ</text>
+  <text x="716" y="136" class="sub">Xᵢ = F(Xᵢ₋₁)</text>
+
+  <line x1="180" y1="115" x2="230" y2="115" class="line"/>
+  <line x1="370" y1="115" x2="420" y2="115" class="line"/>
+  <line x1="560" y1="115" x2="660" y2="115" class="line"/>
+  <line x1="670" y1="115" x2="700" y2="115" class="line"/>
+
+  <text x="40" y="190" class="sub">When Xᵢ = F(Xᵢ), Xᵢ is a fixed point.</text>
+</svg>
