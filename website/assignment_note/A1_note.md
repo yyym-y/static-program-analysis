@@ -1,19 +1,5 @@
 # 作业1：活跃变量分析和迭代求解器
 
-<div class="page-toc">
-<strong>目录</strong>
-<ul>
-  <li><a href="#理论回顾">理论回顾</a></li>
-  <li><a href="#代码实现">代码实现</a>
-    <ul>
-      <li><a href="#solverinitializebackward"><code>Solver.initializeBackward</code></a></li>
-      <li><a href="#iterativesolverdosolvebackward"><code>IterativeSolver.doSolveBackward</code></a></li>
-      <li><a href="#livevariableanalysis"><code>LiveVariableAnalysis</code></a></li>
-    </ul>
-  </li>
-</ul>
-</div>
-
 ## 理论回顾
 
 如果变量 $v$ 在点 $p$ 是“活跃”的，意味着 $v$ 在 $p$ 处的值在路径的后续节点中可能会被读取，**且在此之前没有被重新赋值**。

@@ -155,6 +155,14 @@ public class ConstantPropagation extends
 
         Value value1 = in.get(binaryExp.getOperand1());
         Value value2 = in.get(binaryExp.getOperand2());
+        ArithmeticExp arithmeticExp = exp instanceof ArithmeticExp exp1 ? exp1 : null;
+        if (arithmeticExp != null
+                && value2.isConstant()
+                && value2.getConstant() == 0
+                && (arithmeticExp.getOperator() == ArithmeticExp.Op.DIV
+                || arithmeticExp.getOperator() == ArithmeticExp.Op.REM)) {
+            return Value.getUndef();
+        }
         if (value1.isNAC() || value2.isNAC()) {
             return Value.getNAC();
         }
@@ -164,7 +172,7 @@ public class ConstantPropagation extends
 
         int n1 = value1.getConstant();
         int n2 = value2.getConstant();
-        if (exp instanceof ArithmeticExp arithmeticExp) {
+        if (arithmeticExp != null) {
             return switch (arithmeticExp.getOperator()) {
                 case ADD -> Value.makeConstant(n1 + n2);
                 case SUB -> Value.makeConstant(n1 - n2);

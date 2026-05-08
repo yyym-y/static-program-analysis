@@ -44,13 +44,19 @@ class WorkListSolver<Node, Fact> extends Solver<Node, Fact> {
 
         while (!queue.isEmpty()) {
             Node head = queue.remove();
-            if (!cfg.isEntry(head)) {
-                Fact in = analysis.newInitialFact();
-                for (Node pred : cfg.getPredsOf(head)) {
-                    analysis.meetInto(result.getOutFact(pred), in);
-                }
-                result.setInFact(head, in);
+            // if (!cfg.isEntry(head)) {
+            //     Fact in = analysis.newInitialFact();
+            //     for (Node pred : cfg.getPredsOf(head)) {
+            //         analysis.meetInto(result.getOutFact(pred), in);
+            //     }
+            //     result.setInFact(head, in);
+            // }
+
+            Fact in = cfg.isEntry(head) ? analysis.newBoundaryFact(cfg) : analysis.newInitialFact();
+            for (Node pred : cfg.getPredsOf(head)) {
+                analysis.meetInto(result.getOutFact(pred), in);
             }
+            result.setInFact(head, in);
 
             if (analysis.transferNode(head, result.getInFact(head), result.getOutFact(head))) {
                 for (Node succ : cfg.getSuccsOf(head)) {
