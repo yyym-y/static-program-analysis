@@ -26,6 +26,9 @@ import pascal.taie.analysis.dataflow.analysis.DataflowAnalysis;
 import pascal.taie.analysis.dataflow.fact.DataflowResult;
 import pascal.taie.analysis.graph.cfg.CFG;
 
+import java.util.LinkedList;
+import java.util.Queue;
+
 class WorkListSolver<Node, Fact> extends Solver<Node, Fact> {
 
     WorkListSolver(DataflowAnalysis<Node, Fact> analysis) {
@@ -34,11 +37,48 @@ class WorkListSolver<Node, Fact> extends Solver<Node, Fact> {
 
     @Override
     protected void doSolveForward(CFG<Node> cfg, DataflowResult<Node, Fact> result) {
-        // TODO - finish me
+        Queue<Node> queue = new LinkedList<>();
+        for (Node node : cfg) {
+            queue.add(node);
+        }
+
+        while (!queue.isEmpty()) {
+            Node head = queue.remove();
+
+            Fact in = cfg.isEntry(head) ? analysis.newBoundaryFact(cfg) : analysis.newInitialFact();
+            for (Node pred : cfg.getPredsOf(head)) {
+                analysis.meetInto(result.getOutFact(pred), in);
+            }
+            result.setInFact(head, in);
+
+            if (analysis.transferNode(head, result.getInFact(head), result.getOutFact(head))) {
+                for (Node succ : cfg.getSuccsOf(head)) {
+                    queue.add(succ);
+                }
+            }
+        }
     }
 
     @Override
     protected void doSolveBackward(CFG<Node> cfg, DataflowResult<Node, Fact> result) {
         // TODO - finish me
+        boolean changed = false;
+
+        do {
+            changed = false;
+            for(Node node : cfg) {
+                // OUT = union IN of successor
+                Fact tem = analysis.newInitialFact();
+                for(Node suc : cfg.getSuccsOf(node)) {
+                    analysis.meetInto(result.getInFact(suc), tem);
+                }
+                result.setOutFact(node, tem);
+            }
+            for(Node node : cfg) {
+                // IN = use union (OUT \ def) [check IN if change]
+                boolean trans = analysis.transferNode(node , result.getInFact(node), result.getOutFact(node));
+                changed |= trans;
+            }
+        } while (changed);
     }
 }

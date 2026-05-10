@@ -36,6 +36,7 @@ import pascal.taie.ir.IR;
 import pascal.taie.ir.exp.ArithmeticExp;
 import pascal.taie.ir.exp.ArrayAccess;
 import pascal.taie.ir.exp.CastExp;
+import pascal.taie.ir.exp.ConditionExp;
 import pascal.taie.ir.exp.FieldAccess;
 import pascal.taie.ir.exp.NewExp;
 import pascal.taie.ir.exp.RValue;
@@ -46,6 +47,10 @@ import pascal.taie.ir.stmt.Stmt;
 import pascal.taie.ir.stmt.SwitchStmt;
 
 import java.util.Comparator;
+import java.util.ArrayDeque;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Queue;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -56,6 +61,7 @@ public class DeadCodeDetection extends MethodAnalysis {
     public DeadCodeDetection(AnalysisConfig config) {
         super(config);
     }
+
 
     @Override
     public Set<Stmt> analyze(IR ir) {
@@ -69,9 +75,101 @@ public class DeadCodeDetection extends MethodAnalysis {
                 ir.getResult(LiveVariableAnalysis.ID);
         // keep statements (dead code) sorted in the resulting set
         Set<Stmt> deadCode = new TreeSet<>(Comparator.comparing(Stmt::getIndex));
-        // TODO - finish me
-        // Your task is to recognize dead code in ir and add it to deadCode
+
+        // CFG unreachable And Branch Unreachable
+        Set<Stmt> reachable = new HashSet<>();
+        Queue<Stmt> workList = new ArrayDeque<>();
+        workList.add(cfg.getEntry());
+        while (!workList.isEmpty()) {
+            Stmt head = workList.poll();
+            if (reachable.contains(head)) continue;
+            reachable.add(head);
+            Set<Edge<Stmt>> edges = cfg.getOutEdgesOf(head);
+            for(Edge<Stmt> edge : edges) {
+                if(! canReach(edge, constants, cfg)) continue;
+                workList.add(edge.getTarget());
+            }
+        }
+        for (Stmt stmt : ir.getStmts()) {
+            if (!reachable.contains(stmt)) {
+                deadCode.add(stmt);
+            }
+        }
+
+        // deadAssign
+        for (Stmt stmt : cfg) {
+            SetFact<Var> out = liveVars.getOutFact(stmt); // must be out fact
+            if(! stmt.getDef().isPresent())
+                continue;
+            
+            if (stmt.getDef().get() instanceof Var var) {
+                // System.out.println(var + "------------------------");
+                if (out.contains(var)) continue;
+                // System.out.println(var + "************************");
+                List<RValue> use = stmt.getUses();
+                boolean safe = true;
+                for (RValue rval : use) {
+                    safe &= DeadCodeDetection.hasNoSideEffect(rval);
+                }
+                if (!safe) continue;
+                deadCode.add(stmt);
+            }
+        }
+
         return deadCode;
+    }
+
+/*
+.\gradlew.bat test --tests pascal.taie.analysis.dataflow.analysis.DeadCodeTest.testControlFlowUnreachable --info
+.\gradlew.bat test --tests pascal.taie.analysis.dataflow.analysis.DeadCodeTest.testUnreachableIfBranch --info
+.\gradlew.bat test --tests pascal.taie.analysis.dataflow.analysis.DeadCodeTest.testUnreachableSwitchBranch --info
+.\gradlew.bat test --tests pascal.taie.analysis.dataflow.analysis.DeadCodeTest.testDeadAssignment --info
+.\gradlew.bat test --tests pascal.taie.analysis.dataflow.analysis.DeadCodeTest.testLoops --info
+
+*/
+
+
+    private boolean canReach(Edge<Stmt> edge, DataflowResult<Stmt, CPFact> consRes, CFG<Stmt> cfg) {
+        Stmt target = edge.getTarget(), source = edge.getSource();
+        if(source instanceof If ifStmt) {
+            // System.out.println(source + "------------------------");
+            ConditionExp conExp = ifStmt.getCondition();
+            Var var1 = conExp.getOperand1(); Var var2 = conExp.getOperand2();
+            CPFact in = consRes.getInFact(ifStmt);
+            Value v1 = in.get(var1), v2 = in.get(var2);
+            if(!(v1.isConstant() && v2.isConstant())) return true;
+            boolean result = true;
+            switch (conExp.getOperator()) {
+                case EQ -> result = v1.getConstant() == v2.getConstant();
+                case NE -> result = v1.getConstant() != v2.getConstant();
+                case LT -> result = v1.getConstant() < v2.getConstant();
+                case GT -> result = v1.getConstant() > v2.getConstant();
+                case LE -> result = v1.getConstant() <= v2.getConstant();
+                case GE -> result = v1.getConstant() >= v2.getConstant();
+            }
+            // System.out.println(result + "####");
+            if(edge.getKind() == Edge.Kind.IF_TRUE && result) return true;
+            if(edge.getKind() == Edge.Kind.IF_FALSE && ! result) return true;
+            return false;
+        }
+        if(source instanceof SwitchStmt switchStmt) {
+            Var var = switchStmt.getVar();
+            CPFact in = consRes.getInFact(switchStmt);
+            Value val = in.get(var);
+            if(! val.isConstant()) return true;
+            if(edge.isSwitchCase() && edge.getCaseValue() == val.getConstant())
+                return true;
+            if(edge.getKind() == Edge.Kind.SWITCH_DEFAULT) {
+                boolean res = false;
+                for(Edge<Stmt> outEdge : cfg.getOutEdgesOf(source)) {
+                    if(outEdge.isSwitchCase() && outEdge.getCaseValue() == val.getConstant())
+                        res = true;
+                }
+                return !res;
+            }
+            return false;
+        }
+        return true;
     }
 
     /**
