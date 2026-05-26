@@ -1,0 +1,4 @@
+interface:
+  display_name: "YYYM Note Style"
+  short_description: "按 yyym 的技术笔记口吻整理素材"
+  default_prompt: "Use $yyym-note-style to turn this technical material into a note in my personal style."

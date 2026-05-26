@@ -103,9 +103,7 @@ public class DeadCodeDetection extends MethodAnalysis {
                 continue;
             
             if (stmt.getDef().get() instanceof Var var) {
-                // System.out.println(var + "------------------------");
                 if (out.contains(var)) continue;
-                // System.out.println(var + "************************");
                 List<RValue> use = stmt.getUses();
                 boolean safe = true;
                 for (RValue rval : use) {
