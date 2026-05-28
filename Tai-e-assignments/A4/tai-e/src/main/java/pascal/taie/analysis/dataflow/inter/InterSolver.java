@@ -24,8 +24,9 @@ package pascal.taie.analysis.dataflow.inter;
 
 import pascal.taie.analysis.dataflow.fact.DataflowResult;
 import pascal.taie.analysis.graph.icfg.ICFG;
-import pascal.taie.util.collection.SetQueue;
+import pascal.taie.analysis.graph.icfg.ICFGEdge;
 
+import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -60,9 +61,45 @@ class InterSolver<Method, Node, Fact> {
 
     private void initialize() {
         // TODO - finish me
+        for(Node node : icfg) {
+            result.setInFact(node, analysis.newInitialFact());
+            result.setOutFact(node, analysis.newInitialFact());
+        }
+        Set<Node> boundaryNodes = icfg.entryMethods()
+                .map(m -> icfg.getEntryOf(m))
+                .collect(Collectors.toSet());
+        boundaryNodes.forEach(n -> {
+            result.setInFact(n, analysis.newBoundaryFact(n));
+            result.setOutFact(n, analysis.newBoundaryFact(n));
+        });
     }
 
     private void doSolve() {
         // TODO - finish me
+        workList = new ArrayDeque<>();
+        for(Node node : icfg) {
+            workList.add(node);
+        }
+        Set<Node> boundaryNodes = icfg.entryMethods()
+                .map(m -> icfg.getEntryOf(m))
+                .collect(Collectors.toSet());
+        while(!workList.isEmpty()) {
+            Node head = workList.poll();
+            // IN FACT
+            Set<ICFGEdge<Node>> inEdge = icfg.getInEdgesOf(head);
+            Fact in = boundaryNodes.contains(head) ? analysis.newBoundaryFact(head) : analysis.newInitialFact();
+            for (ICFGEdge<Node> pred : inEdge) {
+                Fact newOut = analysis.transferEdge(pred, result.getOutFact(pred.getSource()));
+                analysis.meetInto(newOut, in);
+            }
+            result.setInFact(head, in);
+
+            // OUT FACT
+            if (analysis.transferNode(head, result.getInFact(head), result.getOutFact(head))) {
+                for (Node succ : icfg.getSuccsOf(head)) {
+                    workList.add(succ);
+                }
+            }
+        }
     }
 }

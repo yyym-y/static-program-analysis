@@ -99,14 +99,15 @@ class CHABuilder implements CGBuilder<Invoke, JMethod> {
         // TODO - finish me
         Set<JMethod> res = new HashSet<>();
 
-        System.out.println(callSite.toString() + " -Kind- " + CallGraphs.getCallKind(callSite));
+        // System.out.println(callSite.toString() + " -Kind- " + CallGraphs.getCallKind(callSite));
         // System.out.println(callSite.getMethodRef().getDeclaringClass());
 
         switch (CallGraphs.getCallKind(callSite)) {
             case STATIC : {}
             case SPECIAL : { 
-                res.add(dispatch(callSite.getMethodRef().getDeclaringClass(),
-                    callSite.getMethodRef().getSubsignature()));
+                JMethod m = dispatch(callSite.getMethodRef().getDeclaringClass(),
+                    callSite.getMethodRef().getSubsignature());
+                if(m != null) res.add(m);
                 break;
             }
             case VIRTUAL : {}
@@ -118,22 +119,26 @@ class CHABuilder implements CGBuilder<Invoke, JMethod> {
                 workList.add(callSite.getMethodRef().getDeclaringClass());
                 while(! workList.isEmpty()) {
                     JClass head = workList.poll();
-                    if(CallGraphs.getCallKind(callSite) == CallKind.VIRTUAL) {
-                        hierarchy.getDirectSubclassesOf(head).forEach(obj -> {
-                            subClasses.add(obj);
-                        });
-                    } else if (CallGraphs.getCallKind(callSite) == CallKind.INTERFACE) {
+                    if(head.isInterface()) {
                         hierarchy.getDirectImplementorsOf(head).forEach(obj -> {
                             subClasses.add(obj);
+                            workList.add(obj);
                         });
                         hierarchy.getDirectSubinterfacesOf(head).forEach(obj -> {
                             subClasses.add(obj);
+                            workList.add(obj);
+                        });
+                    } else {
+                        hierarchy.getDirectSubclassesOf(head).forEach(obj -> {
+                            if(subClasses.add(obj)) {
+                                workList.add(obj);
+                            }
                         });
                     }
                 }
                 for(JClass cls : subClasses) {
                     JMethod m = dispatch(cls, callSite.getMethodRef().getSubsignature());
-                    if(m.isAbstract()) continue;
+                    if(m == null || m.isAbstract()) continue;
                     res.add(m);
                 }
             }

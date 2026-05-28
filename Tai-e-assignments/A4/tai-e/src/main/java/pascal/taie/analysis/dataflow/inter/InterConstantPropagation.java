@@ -25,7 +25,6 @@ package pascal.taie.analysis.dataflow.inter;
 import pascal.taie.analysis.dataflow.analysis.constprop.CPFact;
 import pascal.taie.analysis.dataflow.analysis.constprop.ConstantPropagation;
 import pascal.taie.analysis.dataflow.analysis.constprop.Value;
-import pascal.taie.analysis.graph.cfg.CFG;
 import pascal.taie.analysis.graph.cfg.CFGBuilder;
 import pascal.taie.analysis.graph.icfg.CallEdge;
 import pascal.taie.analysis.graph.icfg.CallToReturnEdge;
@@ -33,7 +32,6 @@ import pascal.taie.analysis.graph.icfg.NormalEdge;
 import pascal.taie.analysis.graph.icfg.ReturnEdge;
 import pascal.taie.config.AnalysisConfig;
 import pascal.taie.ir.IR;
-import pascal.taie.ir.exp.InvokeExp;
 import pascal.taie.ir.exp.Var;
 import pascal.taie.ir.stmt.Invoke;
 import pascal.taie.ir.stmt.Stmt;
@@ -79,75 +77,69 @@ public class InterConstantPropagation extends
 
     @Override
     protected boolean transferCallNode(Stmt stmt, CPFact in, CPFact out) {
-        // TODO - finish me
-        System.out.println("========---------------------------------");
-        if(! (stmt instanceof Invoke)) return false;
-        Invoke invokeStmt = (Invoke)stmt;
-        System.out.println(invokeStmt.toString() + "========");
-        return false;
+        CPFact oldOut = out.copy();
+        out.clear();
+        out.copyFrom(in);
+        return !out.equals(oldOut);
     }
 
     @Override
     protected boolean transferNonCallNode(Stmt stmt, CPFact in, CPFact out) {
-        // TODO - finish me
         return cp.transferNode(stmt, in, out);
     }
 
     @Override
     protected CPFact transferNormalEdge(NormalEdge<Stmt> edge, CPFact out) {
-        // TODO - finish me  
-        return out;
+        return out.copy();
     }
 
     @Override
     protected CPFact transferCallToReturnEdge(CallToReturnEdge<Stmt> edge, CPFact out) {
-        // TODO - finish me
         Stmt source = edge.getSource();
         CPFact res = out.copy();
-        source.getDef().ifPresent(def -> {
-            res.update((Var) def, Value.getUndef());
-        });
+        source.getDef()
+                .filter(def -> def instanceof Var)
+                .map(def -> (Var) def)
+                .filter(ConstantPropagation::canHoldInt)
+                .ifPresent(var -> res.update(var, Value.getUndef()));
         return res;
     }
 
     @Override
     protected CPFact transferCallEdge(CallEdge<Stmt> edge, CPFact callSiteOut) {
-        // TODO - finish me
         Stmt source = edge.getSource(), target = edge.getTarget();
         CPFact res = new CPFact();
         IR ir = icfg.getContainingMethodOf(target).getIR();
         List<Var> fval = ir.getParams();
-        if(! (source instanceof Invoke))
-            return null;
+        if (!(source instanceof Invoke)) {
+            return res;
+        }
         Invoke invokeStmt = (Invoke)source;
         List<Var> cval = invokeStmt.getRValue().getArgs();
         for(int i = 0 ; i < cval.size() ; i ++) {
-            res.update(fval.get(i), callSiteOut.get(cval.get(i)));
+            Var param = fval.get(i);
+            if (ConstantPropagation.canHoldInt(param)) {
+                res.update(param, callSiteOut.get(cval.get(i)));
+            }
         }
         return res;
     }
 
     @Override
     protected CPFact transferReturnEdge(ReturnEdge<Stmt> edge, CPFact returnOut) {
-        // TODO - finish me
-        Stmt source = edge.getSource(), target = edge.getTarget();
         CPFact res = new CPFact();
-        target.getDef().ifPresent(def -> {
-            Value val = Value.getUndef();
-            for (Var var : edge.getReturnVars()) {
-                Value rval = returnOut.get(var);
-                if(val == Value.getUndef() || val == rval) {
-                    val = rval; continue;
-                }
-                val = Value.getNAC();
-                break;
-            }
-            res.update((Var) def, val);
-        });
+        Stmt callSite = edge.getCallSite();
+        callSite.getDef()
+                .filter(def -> def instanceof Var)
+                .map(def -> (Var) def)
+                .filter(ConstantPropagation::canHoldInt)
+                .ifPresent(var -> {
+                    Value val = Value.getUndef();
+                    for (Var returnVar : edge.getReturnVars()) {
+                        val = cp.meetValue(val, returnOut.get(returnVar));
+                    }
+                    res.update(var, val);
+                });
         return res;
     }
 }
-
-/*
-gradlew.bat test --tests pascal.taie.analysis.dataflow.analysis.constprop.InterCPTest.testExample --info
-*/
