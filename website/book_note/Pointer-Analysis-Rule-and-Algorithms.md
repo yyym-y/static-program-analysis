@@ -1,513 +1,279 @@
 # 指针分析规则和算法
 
-这一节关注的问题是：**如何把指针相关语句转化成约束，并用算法求出 points-to set**。
+这一节关心两个问题：
 
-前面已经知道，指针分析维护的是：
+1. 如何把指针相关语句翻译成 points-to 约束？
+2. 如何用算法求出所有 pointer 的 points-to set？
 
-$$
-pt(p)
-$$
+默认设定仍然是：context-insensitive、flow-insensitive、field-sensitive，并使用 allocation-site abstraction。
 
-也就是指针 $p$ 可能指向的抽象对象集合。  
-现在要做的是把 `new`、赋值、字段读写、函数调用都转化成 points-to set 之间的传播关系。
+## 1. 记号
 
+课程中的基本定义如下：
 
-## 指针分析规则
+- 变量：$x,y\in V$
+- 字段：$f,g\in F$
+- 抽象对象：$o_i,o_j\in O$
+- 实例字段：$o_i.f\in O\times F$
+- Pointer：变量或实例字段
 
-课程中给出的规则可以理解为推导规则：
+因此 $Pointer = V \cup (O \times F)$。points-to 函数为 $pt: Pointer \rightarrow \mathcal{P}(O)$，也就是说，每个 pointer 都映射到一个抽象对象集合。
 
-> 横线上的内容是前提 `premises`，横线下的内容是结论 `conclusion`。
+## 2. 规则总览
 
-只要前提成立，就可以把结论中的 points-to fact 加入分析结果。
+四类基础语句可以先概括成下面这张表：
 
+![](./img/RULE.png)
+
+`New` 直接产生 points-to fact；`Assign` 可以一开始加入 PFG 边；`Store` 和 `Load` 依赖 base pointer 的 points-to set，需要随着分析逐步展开。
+
+## 3. 基本推导规则
+
+规则的读法是：横线上面是前提，横线下面是结论。只要前提成立，就把结论加入 points-to set。
 
 ### New
 
-```text
-i: x = new T()
----------------
-o_i ∈ pt(x)
-```
-
-第 $i$ 条 `new` 语句对应一个抽象对象 $o_i$。  
-所以：
-
-```java
-x = new A(); // i
-```
-
-会直接产生：
-
 $$
-o_i \in pt(x)
+\frac{i: x = \mathrm{new}\ T()}{o_i \in pt(x)}
 $$
 
+第 $i$ 个 allocation site 产生抽象对象 $o_i$，并加入 `x` 的 points-to set。
 
 ### Assign
 
-```text
-x = y      o_i ∈ pt(y)
-----------------------
-o_i ∈ pt(x)
-```
-
-`x = y` 表示 `y` 可能指向的对象也会流到 `x`。
-
-也就是：
-
 $$
-pt(y) \subseteq pt(x)
+\frac{x = y \quad o_i \in pt(y)}{o_i \in pt(x)}
 $$
 
+`x = y` 表示 `y` 指向的对象也会流入 `x`，即 $pt(y) \subseteq pt(x)$。
 
 ### Store
 
-```text
-x.f = y      o_i ∈ pt(x)      o_j ∈ pt(y)
------------------------------------------
-o_j ∈ pt(o_i.f)
-```
-
-`x.f = y` 是字段写入。  
-如果 `x` 可能指向 $o_i$，那么这条语句实际写入的是 $o_i.f$。
-
-因此：
-
 $$
-\forall o_i \in pt(x), \quad pt(y) \subseteq pt(o_i.f)
+\frac{x.f = y \quad o_i \in pt(x) \quad o_j \in pt(y)}{o_j \in pt(o_i.f)}
 $$
 
+如果 `x` 可能指向 $o_i$，那么 `x.f = y` 会把 $pt(y)$ 写入 $o_i.f$，即对每个 $o_i\in pt(x)$，都有 $pt(y)\subseteq pt(o_i.f)$。
 
 ### Load
 
-```text
-y = x.f      o_i ∈ pt(x)      o_j ∈ pt(o_i.f)
----------------------------------------------
-o_j ∈ pt(y)
-```
-
-`y = x.f` 是字段读取。  
-如果 `x` 可能指向 $o_i$，那么读取的是 $o_i.f$，其中的对象会继续流入 `y`。
-
-因此：
-
 $$
-\forall o_i \in pt(x), \quad pt(o_i.f) \subseteq pt(y)
+\frac{y = x.f \quad o_i \in pt(x) \quad o_j \in pt(o_i.f)}{o_j \in pt(y)}
 $$
 
-这里可以看到，`Assign` 的传播边一开始就能确定，但 `Store` 和 `Load` 依赖 $pt(x)$，所以它们要等 base pointer 的 points-to set 被发现之后才能展开。
+如果 `x` 可能指向 $o_i$，那么 `y = x.f` 会把 $pt(o_i.f)$ 读到 `y`，即对每个 $o_i\in pt(x)$，都有 $pt(o_i.f)\subseteq pt(y)$。
 
+## 4. 包含约束视角
 
-## Pointer Flow Graph
+上面的推导规则也可以看成包含关系：
 
-为了统一处理这些传播关系，可以构造 **Pointer Flow Graph, PFG**。
+- `x = y`：$pt(y)\subseteq pt(x)$
+- `x.f = y`：对每个 $o\in pt(x)$，有 $pt(y)\subseteq pt(o.f)$
+- `y = x.f`：对每个 $o\in pt(x)$，有 $pt(o.f)\subseteq pt(y)$
 
-PFG 的节点是 pointer，包括：
+所以指针分析本质上是在解一组包含约束。
 
-- 局部变量，例如 `x`、`y`
-- 抽象对象字段，例如 $o_i.f$
+`Assign` 的边可以一开始就确定；`Store` 和 `Load` 的边依赖 base pointer 的 points-to set，需要随着分析逐步展开。
 
-PFG 的边表示 points-to set 的包含关系。  
-如果有边：
+## 5. Pointer Flow Graph
 
-$$
-p \rightarrow q
-$$
+![](./img/PFG.png)
 
-就表示：
+Pointer Flow Graph, PFG 是一个有向图，用来表示对象如何在 pointers 之间流动。
 
-$$
-pt(p) \subseteq pt(q)
-$$
+- 节点：变量或抽象字段，例如 `x`、`y`、$o_i.f$
+- 边：$p\rightarrow q$ 表示 $pt(p)\subseteq pt(q)$
 
-也就是 `p` 指向的对象会继续传播到 `q`。
+语句和 PFG 边的关系可以写成：
 
-例如：
+- `x = y` 加入 $y\rightarrow x$
+- `x.f = y` 对每个 $o_i\in pt(x)$ 加入 $y\rightarrow o_i.f$
+- `y = x.f` 对每个 $o_i\in pt(x)$ 加入 $o_i.f\rightarrow y$
+
+如果 PFG 上存在从 `p` 到 `q` 的路径，那么 `p` 指向的对象可能最终流到 `q`。因此求解 points-to set 可以理解成在 PFG 上传播对象。
+
+## 6. 为什么 PFG 要动态更新
+
+字段边依赖 base pointer。
 
 ```java
-x = y;
+c.f = a;
+e = d.f;
 ```
 
-会产生边：
+只有当分析发现 $o_i\in pt(c)$ 且 $o_i\in pt(d)$ 时，才能加入 $a\rightarrow o_i.f$ 和 $o_i.f\rightarrow e$。
 
-$$
-y \rightarrow x
-$$
+因此构建 PFG 和传播 points-to 信息是相互依赖的：
 
-字段相关语句则需要结合 base pointer：
+1. 传播产生新的 points-to fact
+2. 新 fact 让更多字段边可以被加入
+3. 新边又触发更多传播
+
+## 7. Worklist 算法
+
+![](./img/algotithms.png)
+
+简单的描述一下 propagate 函数，实际上是将新增的信息从源点一直往下流，直到流不动为止
+
+`AddEdge` 需要注意已经存在的 points-to 信息：如果新边加入后不传播 $pt(s)$ 中已有的对象，就会漏掉旧 fact。
+
+## 8. 为什么只传播 $\Delta$
+
+假设当前 $pt(x)=\{o_1,o_2\}$，worklist 取出 $pts=\{o_2,o_3\}$，真正新增的只有 $\Delta=pts-pt(x)=\{o_3\}$。
+
+旧对象已经沿着 `x` 的后继边传播过，重复传播只会浪费时间。
+
+这样做有两个好处：
+
+- 避免重复工作，算法更快
+- 每个 points-to fact 只会从“未知”变成“已知”一次，因此最终会停下来
+
+## 9. 小例子
 
 ```java
-x.f = y;
+b = new C(); // o_1
+a = b;
+c = new C(); // o_3
+c.f = a;
+d = c;
+c.f = d;
+e = d.f;
 ```
 
-如果 $o_i \in pt(x)$，就加入：
+![](./img/example.png)
 
-$$
-y \rightarrow o_i.f
-$$
+## 10. 过程间指针分析
 
-对于：
+加入方法调用后，指针分析和调用图构建互相依赖：
+
+- 解析虚调用需要 receiver 的 points-to set
+- 新的调用边会让更多方法变成 reachable
+- 新方法中的语句又会产生新的 points-to facts
+
+所以过程间指针分析不能简单地分成两步：
+
+1. 先把完整 Call Graph 建好
+2. 再沿着 Call Graph 做指针分析
+
+原因是：虚调用的目标方法本身就依赖指针分析结果。
 
 ```java
-y = x.f;
-```
-
-如果 $o_i \in pt(x)$，就加入：
-
-$$
-o_i.f \rightarrow y
-$$
-
-因此 PFG 不是完全一次性建好的。  
-随着 points-to set 不断扩大，新的字段节点和字段边也会被逐步加入。
-
-
-## 为什么是 $o_i.f$ 而不是 `x.f`
-
-这个问题本质上和别名有关。
-
-```java
-1: x = new T(); // o1
-2: y = x;
-3: x.f = z;
-4: w = y.f;
-```
-
-如果通过 `x.f` 来传播，那么第 3 行只能得到：
-
-$$
-pt(z) \subseteq pt(x.f)
-$$
-
-但是第 4 行读的是 `y.f`，分析器还需要额外知道 `x` 和 `y` 是不是别名。
-
-正确的做法是把字段挂在对象上：
-
-1. 因为 $pt(x) = \{o_1\}$，所以 `x.f = z` 写入 $o_1.f$
-2. 因为 $pt(y) = \{o_1\}$，所以 `w = y.f` 读取 $o_1.f$
-3. 于是 $pt(z)$ 可以通过 $o_1.f$ 传播到 $pt(w)$
-
-这里 $o_1$ 充当了连接 `x` 和 `y` 的中间对象。  
-所以字段节点一般写成 $o_i.f$，而不是 `x.f`。
-
-
-## Worklist Algorithm
-
-PFG 建好之后，points-to set 可以沿着边传播。  
-课程中的算法使用 worklist，核心思想是：每次只传播新增的 points-to facts。
-
-整体结构可以写成：
-
-```text
-foreach statement i: x = new T() do
-    WL.add(<x, {o_i}>)
-
-foreach statement x = y do
-    AddEdge(y, x)
-
-while WL is not empty do
-    <n, pts> = WL.remove()
-    Δ = pts - pt(n)
-
-    if Δ is not empty then
-        pt(n) = pt(n) ∪ Δ
-
-        foreach edge n -> s in PFG do
-            WL.add(<s, Δ>)
-
-        if n is a variable x then
-            foreach o_i in Δ do
-                foreach statement x.f = y do
-                    AddEdge(y, o_i.f)
-
-                foreach statement y = x.f do
-                    AddEdge(o_i.f, y)
-```
-
-其中 `AddEdge(p, q)` 表示往 PFG 中加入一条边：
-
-```text
-if edge p -> q is new then
-    add p -> q to PFG
-    WL.add(<q, pt(p)>)
-```
-
-这里要注意，新边加入之后，要把 `pt(p)` 里已经存在的对象也传播到 `q`。  
-否则这条边只会收到后面新增的对象，漏掉之前已经算出来的结果。
-
-
-## 为什么只传播 $\Delta$
-
-设当前已经有：
-
-$$
-pt(x) = \{o_1, o_2\}
-$$
-
-这次从 worklist 里取出：
-
-$$
-pts = \{o_2, o_3\}
-$$
-
-那么真正新增的只有：
-
-$$
-\Delta = pts - pt(x) = \{o_3\}
-$$
-
-因此算法只需要把 $o_3$ 继续向外传播。  
-已经传播过的 $o_1$ 和 $o_2$ 不需要反复处理。
-
-
-## 一个简单例子
-
-```java
-1: a = new A(); // o1
-2: b = new B(); // o2
-3: c = a;
-4: c.f = b;
-5: d = a.f;
-```
-
-初始化时：
-
-```text
-WL = <a, {o1}>, <b, {o2}>
-PFG has edge a -> c
-```
-
-先处理 `a`：
-
-$$
-pt(a) = \{o_1\}
-$$
-
-沿着边 $a \rightarrow c$ 传播：
-
-$$
-pt(c) = \{o_1\}
-$$
-
-此时第 4 行 `c.f = b` 可以展开。  
-因为 $o_1 \in pt(c)$，所以加入字段边：
-
-$$
-b \rightarrow o_1.f
-$$
-
-再结合：
-
-$$
-pt(b) = \{o_2\}
-$$
-
-可以得到：
-
-$$
-pt(o_1.f) = \{o_2\}
-$$
-
-第 5 行 `d = a.f` 也可以展开。  
-因为 $o_1 \in pt(a)$，所以加入：
-
-$$
-o_1.f \rightarrow d
-$$
-
-最后得到：
-
-$$
-pt(d) = \{o_2\}
-$$
-
-这说明算法不是按源程序顺序执行，而是在 PFG 上不断传播指向关系。
-
-
-## 处理函数调用
-
-到过程间之后，指针分析还要处理函数调用，尤其是 virtual call：
-
-```java
-r = x.k(a1, a2, ...)
-```
-
-这类调用的目标方法取决于 `x` 指向对象的运行时类型。  
-因此指针分析和 call graph 构建会互相依赖：
-
-- 要解析 virtual call，需要知道 $pt(x)$
-- 要分析被调用方法，需要先把它加入 reachable methods
-- 被调用方法中的语句又会产生新的 points-to facts
-
-所以这里通常采用 on-the-fly 的方式：一边做指针分析，一边构建 Call Graph。
-
-
-## this 变量
-
-在静态分析建模中，`this` 可以看成实例方法中的一个特殊局部变量。
-
-例如：
-
-```java
-class A {
-    void foo(B p) {
-        this.f = p;
-    }
+interface I {
+    void foo();
 }
-```
 
-可以认为方法 `foo` 中有一个特殊变量：
+class A implements I {
+    public void foo() {}
+}
 
-$$
-foo_{this}
-$$
-
-当调用点是：
-
-```java
-x.foo(y);
-```
-
-并且目标方法解析到 `A.foo` 时，就需要加入：
-
-$$
-x \rightarrow A.foo_{this}
-$$
-
-也就是 receiver 对象流入被调用方法的 `this`。  
-同时，实参也要流入形参：
-
-$$
-y \rightarrow p
-$$
-
-如果有返回值，还要把被调用方法的返回变量连回调用点左侧变量。
-
-
-## 过程间指针分析算法
-
-算法中通常维护几类集合或图：
-
-- `WL`：待传播的 points-to facts
-- `PFG`：Pointer Flow Graph
-- `CG`：Call Graph
-- `RM`：reachable methods
-- `S`：reachable methods 中的 statements
-
-这里的 `S` 不是全程序语句集合，而是当前已经可达的方法体中的语句。  
-当一个新方法加入 `RM` 后，它的方法体才会进入分析。
-
-整体流程可以概括为：
-
-```text
-AddReachable(main)
-
-while WL is not empty do
-    <n, pts> = WL.remove()
-    Δ = Propagate(n, pts)
-
-    if n is a variable x then
-        foreach o_i in Δ do
-            foreach store statement x.f = y in S do
-                AddEdge(y, o_i.f)
-
-            foreach load statement y = x.f in S do
-                AddEdge(o_i.f, y)
-
-            foreach call site cs: r = x.k(a1, ..., an) in S do
-                m = Dispatch(type(o_i), k)
-                AddCallEdge(cs, m)
-```
-
-`AddReachable(m)` 负责把新发现的方法加入分析范围：
-
-```text
-if m not in RM then
-    add m to RM
-    add statements of m to S
-
-    foreach statement i: x = new T() in m do
-        WL.add(<x, {o_i}>)
-
-    foreach statement x = y in m do
-        AddEdge(y, x)
-
-    foreach static/special call cs in m do
-        resolve target method m'
-        AddCallEdge(cs, m')
-```
-
-`AddCallEdge(cs, m)` 负责真正加入调用边，并建立参数、返回值的 PFG 边：
-
-```text
-if cs -> m is new in CG then
-    add cs -> m to CG
-    AddReachable(m)
-
-    AddEdge(receiver, m_this)
-
-    foreach actual argument a_i and formal parameter p_i do
-        AddEdge(a_i, p_i)
-
-    AddEdge(m_ret, lhs)
-```
-
-如果是 static call，没有 receiver，也就不需要传递 `this`。  
-如果是 instance call，receiver 必须流入被调用方法的 `this`。
-
-
-## Virtual Call 的解析
-
-看一个例子：
-
-```java
-class A { void foo() {} }
-class B extends A { void foo() {} }
+class B implements I {
+    public void foo() {}
+}
 
 void main() {
-    A x;
-    if (...) {
-        x = new A(); // o1
-    } else {
-        x = new B(); // o2
-    }
+    I x = new A(); // o1
     x.foo();
 }
 ```
 
-对于调用点 `x.foo()`，如果分析得到：
+如果只看声明类型 `I`，`x.foo()` 可能调用所有实现了 `I.foo` 的方法；但如果指针分析知道 $pt(x)=\{o_1\}$，并且 $o_1$ 的类型是 `A`，那么这个调用点只需要连到 `A.foo`。
 
-$$
-pt(x) = \{o_1, o_2\}
-$$
+因此课程采用 on-the-fly call graph construction：
 
-那么需要分别根据对象类型进行 dispatch：
+> 一边传播 points-to 信息，一边根据新发现的 receiver object 解析虚调用，并把新方法加入分析范围。
 
-$$
-Dispatch(type(o_1), foo)
-$$
+这里有两个关键集合：
 
-$$
-Dispatch(type(o_2), foo)
-$$
+- `RM`：reachable methods，当前已经确认可达的方法
+- `S`：reachable methods 里的语句集合
 
-如果 $o_1$ 的类型是 `A`，$o_2$ 的类型是 `B`，那么 call graph 中可能加入两条边：
+注意，`S` 不是全程序所有语句。只有当一个方法进入 `RM` 后，它的方法体才会加入 `S`，其中的 `new`、赋值、字段读写和调用语句才会参与分析。
 
-```text
-x.foo() -> A.foo
-x.foo() -> B.foo
+## 11. 调用语句如何变成 PFG 边
+
+![](./img/rule-call.avif)
+
+这张图里的规则可以从左到右读。
+
+调用语句是：
+
+```java
+l: r = x.k(a1, ..., an)
 ```
 
-这比单纯的 CHA 更精确。  
-CHA 主要看类层次结构，而基于指针分析的做法会进一步看 receiver 在当前程序中到底可能指向哪些 allocation site。
+其中 `l` 是调用点，`x` 是 receiver，`k` 是要调用的方法名，`a1 ... an` 是实参，`r` 是接收返回值的变量。
+
+规则上半部分是前提：
+
+- $o_i \in pt(x)$：receiver `x` 可能指向对象 $o_i$
+- $m = Dispatch(o_i, k)$：根据 $o_i$ 的动态类型，解析出真正可能调用的目标方法 `m`
+- $o_u \in pt(a_j)$：第 `j` 个实参 `a_j` 可能指向对象 $o_u$
+- $o_v \in pt(m_{ret})$：目标方法 `m` 的返回变量可能指向对象 $o_v$
+
+规则下半部分是结论：
+
+- $o_i \in pt(m_{this})$：receiver 对象流入被调方法的 `this`
+- $o_u \in pt(m_{p_j})$：第 `j` 个实参对象流入第 `j` 个形参
+- $o_v \in pt(r)$：被调方法的返回对象流回调用点左侧变量 `r`
+
+换成 PFG 边就是：
+
+- receiver 传给 `this`：$x \rightarrow m_{this}$
+- 实参传给形参：$a_j \rightarrow m_{p_j}$
+- 返回值传回调用点：$m_{ret} \rightarrow r$
+
+大白话说，这条规则做了两件事：先用 `pt(x)` 里的对象决定 `x.k(...)` 到底可能调用哪个方法；一旦目标方法 `m` 确定，就把调用者和被调方法之间的参数、`this`、返回值连接起来。
+
+过程间分析的核心，就是把调用点两边的信息连起来。课程这里主要讨论 virtual call：它的目标不能只看语法确定，需要结合 receiver 的 points-to set。
+
+如果后面又发现新的 receiver object，例如 $o_j\in pt(x)$，就要再执行一次 dispatch，可能加入新的调用边。
 
 
-## 最终结果
+## 12. 过程间算法框架
 
-过程间指针分析最后会得到两类结果：
+整体上需要维护：
 
-- 每个 pointer 的 points-to set
-- 分析过程中 on-the-fly 构建出来的 Call Graph
+- `WL`：待传播的 points-to 增量
+- `PFG`：Pointer Flow Graph
+- `CG`：Call Graph
+- `RM`：reachable methods
+- `S`：当前 reachable methods 中的语句集合
 
-这两个结果会继续服务后面的分析。  
-例如字段传播需要 points-to set，过程间数据流分析需要 Call Graph，虚调用解析也依赖 receiver 的 points-to 信息。
+先用大白话描述一下流程：
+
+1. 从 `main` 开始，把 `main` 加入 reachable methods
+2. 扫描 `main` 的语句，把 `new` 产生的对象放入 worklist，把普通赋值变成 PFG 边
+3. worklist 每传播出一个新的 points-to fact，就检查这个变量相关的字段读写和调用点
+4. 如果某个虚调用因为新 receiver object 解析出新目标，就把目标方法加入 reachable methods
+5. 新方法加入后，又会带来新的语句、新的对象、新的 PFG 边
+6. 重复直到 worklist 为空，Call Graph 和 points-to sets 同时达到不动点
+
+核心伪代码：
+
+![](./img/solve-addreachable-processCall.avif)
+
+### AddReachable
+
+`AddReachable(m)` 的作用是：当一个方法第一次被发现可达时，把它的方法体纳入分析。
+
+这里要注意：新方法刚加入时，里面已经能确定的语句要立刻处理。
+
+- `new` 语句产生初始 points-to fact
+- `assign` 语句产生确定的 PFG 边
+- `virtual call` 要等 receiver 的 points-to set 被发现后再解析目标
+
+### ProcessCall
+
+`ProcessCall(x, o_i)` 的作用是：当变量 `x` 新增一个 receiver object $o_i$ 时，检查所有以 `x` 为 receiver 的虚调用。
+
+![](./img/processCall.png)
+
+
+这里的关键是：同一个调用点可能对应多个目标方法。每次发现新的 receiver object，都可能通过 `Dispatch` 解析出一个新目标。
+
+它做了两件事：
+
+- 在 Call Graph 中记录 `l -> m`
+- 在 PFG 中加入参数、`this`、返回值之间的传播边
+
+所以 Call Graph 负责说明“谁可能调用谁”，PFG 负责说明“对象如何跨方法流动”。

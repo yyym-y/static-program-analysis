@@ -1,0 +1,47 @@
+Live reload server started on port: 35729
+Press CTRL+C to quit ...
+
+[0;36minfo:[0m [0;32m>> [0mStarting server ... 
+[0;36minfo:[0m 8 plugins are installed 
+[0;36minfo:[0m 8 explicitly listed 
+[0;36minfo:[0m plugin "katex-plus" is loaded
+[0;36minfo:[0m plugin "ancre-navigation" is loaded
+[0;36minfo:[0m plugin "livereload" is loaded
+[0;36minfo:[0m plugin "highlight" is loaded
+[0;36minfo:[0m plugin "search" is loaded
+[0;36minfo:[0m plugin "lunr" is loaded
+[0;36minfo:[0m plugin "fontsettings" is loaded
+[0;36minfo:[0m plugin "theme-default" is loaded
+[0;36minfo:[0m found 16 pages 
+[0;36minfo:[0m found 37 asset files 
+[0;33mwarn:[0m "this.generator" property is deprecated, use "this.output.name" instead 
+[0;33mwarn:[0m "navigation" property is deprecated 
+[0;33mwarn:[0m "book" property is deprecated, use "this" directly instead 
+[0;33mwarn:[0m "options" property is deprecated, use config.get(key) instead 
+[0;36minfo:[0m [0;32m>> [0mgeneration finished with success in 1.2s ! 
+Serving book on http://localhost:4000
+[0;33mwarn:[0m [0;32m>> [0mRebuild C:\Users\ymy\study\project\static-program-analysis\website\book_note\Pointer-Analysis-Rule-and-Algorithms.md 
+[0;36minfo:[0m [0;32m>> [0mgeneration finished with success in 0.2s ! 
+[0;33mwarn:[0m [0;32m>> [0mRebuild C:\Users\ymy\study\project\static-program-analysis\website\book_note\Pointer-Analysis-Rule-and-Algorithms.md 
+[0;36minfo:[0m [0;32m>> [0mgeneration finished with success in 0.2s ! 
+[0;33mwarn:[0m [0;32m>> [0mRebuild C:\Users\ymy\study\project\static-program-analysis\website\book_note\Pointer-Analysis-Rule-and-Algorithms.md 
+[0;36minfo:[0m [0;32m>> [0mgeneration finished with success in 0.2s ! 
+[0;33mwarn:[0m [0;32m>> [0mRebuild C:\Users\ymy\study\project\static-program-analysis\website\book_note\Pointer-Analysis-Rule-and-Algorithms.md 
+[0;36minfo:[0m [0;32m>> [0mgeneration finished with success in 0.2s ! 
+[0;33mwarn:[0m [0;32m>> [0mRebuild C:\Users\ymy\study\project\static-program-analysis\website\book_note\Pointer-Analysis-Rule-and-Algorithms.md 
+[0;36minfo:[0m [0;32m>> [0mgeneration finished with success in 0.2s ! 
+[0;33mwarn:[0m [0;32m>> [0mRebuild C:\Users\ymy\study\project\static-program-analysis\website\book_note\Pointer-Analysis-Rule-and-Algorithms.md 
+[0;36minfo:[0m [0;32m>> [0mgeneration finished with success in 0.2s ! 
+[0;33mwarn:[0m [0;32m>> [0mRebuild C:\Users\ymy\study\project\static-program-analysis\website\book_note\Pointer-Analysis-Rule-and-Algorithms.md 
+[0;36minfo:[0m [0;32m>> [0mgeneration finished with success in 0.2s ! 
+[0;33mwarn:[0m [0;32m>> [0mRebuild C:\Users\ymy\study\project\static-program-analysis\website\book_note\Pointer-Analysis-Rule-and-Algorithms.md 
+[0;36minfo:[0m [0;32m>> [0mgeneration finished with success in 0.2s ! 
+[0;33mwarn:[0m [0;32m>> [0mRebuild C:\Users\ymy\study\project\static-program-analysis\website\book_note\Pointer-Analysis-Rule-and-Algorithms.md 
+[0;36minfo:[0m [0;32m>> [0mgeneration finished with success in 0.2s ! 
+[0;33mwarn:[0m [0;32m>> [0mRebuild C:\Users\ymy\study\project\static-program-analysis\website\book_note\Pointer-Analysis-Rule-and-Algorithms.md 
+[0;36minfo:[0m [0;32m>> [0mgeneration finished with success in 0.2s ! 
+[0;33mwarn:[0m [0;32m>> [0mRebuild C:\Users\ymy\study\project\static-program-analysis\website\book_note\Pointer-Analysis-Rule-and-Algorithms.md 
+[0;36minfo:[0m [0;32m>> [0mgeneration finished with success in 0.3s ! 
+[0;33mwarn:[0m [0;32m>> [0mRebuild C:\Users\ymy\study\project\static-program-analysis\website\book_note\Pointer-Analysis-Rule-and-Algorithms.md 
+[0;36minfo:[0m [0;32m>> [0mgeneration finished with success in 0.3s ! 
+[0;33mwarn:[0m [0;32m>> [0mRebuild C:\Users\ymy\study\project\static-program-analysis\website\book_note\Pointer-Analysis-Rule-and-Algorithms.md 
