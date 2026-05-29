@@ -77,6 +77,7 @@ public class InterConstantPropagation extends
 
     @Override
     protected boolean transferCallNode(Stmt stmt, CPFact in, CPFact out) {
+        // TODO - finish me
         CPFact oldOut = out.copy();
         out.clear();
         out.copyFrom(in);
@@ -85,16 +86,19 @@ public class InterConstantPropagation extends
 
     @Override
     protected boolean transferNonCallNode(Stmt stmt, CPFact in, CPFact out) {
+        // TODO - finish me
         return cp.transferNode(stmt, in, out);
     }
 
     @Override
     protected CPFact transferNormalEdge(NormalEdge<Stmt> edge, CPFact out) {
+        // TODO - finish me
         return out.copy();
     }
 
     @Override
     protected CPFact transferCallToReturnEdge(CallToReturnEdge<Stmt> edge, CPFact out) {
+        // TODO - finish me
         Stmt source = edge.getSource();
         CPFact res = out.copy();
         source.getDef()
@@ -107,6 +111,7 @@ public class InterConstantPropagation extends
 
     @Override
     protected CPFact transferCallEdge(CallEdge<Stmt> edge, CPFact callSiteOut) {
+        // TODO - finish me
         Stmt source = edge.getSource(), target = edge.getTarget();
         CPFact res = new CPFact();
         IR ir = icfg.getContainingMethodOf(target).getIR();
@@ -127,6 +132,7 @@ public class InterConstantPropagation extends
 
     @Override
     protected CPFact transferReturnEdge(ReturnEdge<Stmt> edge, CPFact returnOut) {
+        // TODO - finish me
         CPFact res = new CPFact();
         Stmt callSite = edge.getCallSite();
         callSite.getDef()

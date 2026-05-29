@@ -130,9 +130,8 @@ class CHABuilder implements CGBuilder<Invoke, JMethod> {
                         });
                     } else {
                         hierarchy.getDirectSubclassesOf(head).forEach(obj -> {
-                            if(subClasses.add(obj)) {
-                                workList.add(obj);
-                            }
+                            subClasses.add(obj)
+                            workList.add(obj);
                         });
                     }
                 }

@@ -15,3 +15,4 @@
         * [作业1：活跃变量分析和迭代求解器](./assignment_note/A1_note.md)
         * [作业2：常量传播和 Worklist 求解器](./assignment_note/A2_note.md)
         * [作业3：死代码检测](./assignment_note/A3_note.md)
+        * [作业4：类层次结构分析与过程间常量传播](./assignment_note/A4_note.md)
