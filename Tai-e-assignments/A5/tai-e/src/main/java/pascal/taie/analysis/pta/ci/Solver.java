@@ -97,6 +97,12 @@ class Solver {
      */
     private void addReachable(JMethod method) {
         // TODO - finish me
+        if(callGraph.contains(method)) return;
+        callGraph.addReachableMethod(method);
+
+        if(! method.isAbstract()) {
+            method.getIR().forEach(stmt -> stmt.accept(stmtProcessor));
+        }
     }
 
     /**
@@ -105,6 +111,19 @@ class Solver {
     private class StmtProcessor implements StmtVisitor<Void> {
         // TODO - if you choose to implement addReachable()
         //  via visitor pattern, then finish me
+        @Override
+        public Void visit(New newStmt) {
+            workList.addEntry(pointerFlowGraph.getVarPtr(newStmt.getLValue()),
+                    new PointsToSet(heapModel.getObj(newStmt)));
+            return null;
+        }
+
+        @Override
+        public Void visit(Copy copyStmt) {
+            addPFGEdge(pointerFlowGraph.getVarPtr(copyStmt.getRValue()),
+                    pointerFlowGraph.getVarPtr(copyStmt.getLValue()));
+            return null;
+        }
     }
 
     /**
@@ -112,6 +131,10 @@ class Solver {
      */
     private void addPFGEdge(Pointer source, Pointer target) {
         // TODO - finish me
+        if(pointerFlowGraph.getSuccsOf(source).contains(target)) return;
+        pointerFlowGraph.addEdge(source, target);
+        if(source.getPointsToSet().isEmpty()) return;
+        workList.addEntry(target, source.getPointsToSet());
     }
 
     /**
@@ -119,6 +142,28 @@ class Solver {
      */
     private void analyze() {
         // TODO - finish me
+        // Add New Assignment to work-list and add edges to PFG
+        while(! workList.isEmpty()) {
+            WorkList.Entry entry = workList.pollEntry();
+
+            PointsToSet diff = propagate(entry.pointer(), entry.pointsToSet());
+            if(diff == null) continue;
+
+            if(entry.pointer() instanceof VarPtr varPtr) {
+                Var var = varPtr.getVar();
+                diff.forEach(obj -> {
+                    var.getStoreFields().forEach(storeField -> addPFGEdge(
+                            pointerFlowGraph.getVarPtr(storeField.getRValue()),
+                            pointerFlowGraph.getInstanceField(obj, storeField.getFieldRef().resolve())));
+
+                    var.getLoadFields().forEach(loadField -> addPFGEdge(
+                            pointerFlowGraph.getInstanceField(obj, loadField.getFieldRef().resolve()),
+                            pointerFlowGraph.getVarPtr(loadField.getLValue())));
+
+                    processCall(var, obj);
+                });
+            }
+        }
     }
 
     /**
@@ -127,17 +172,54 @@ class Solver {
      */
     private PointsToSet propagate(Pointer pointer, PointsToSet pointsToSet) {
         // TODO - finish me
-        return null;
+        PointsToSet diff = new PointsToSet();
+        pointsToSet.forEach(obj -> {
+            if(! pointer.getPointsToSet().contains(obj)) {
+                diff.addObject(obj);
+            }
+        });
+        if(diff.isEmpty()) return null;
+        
+        diff.forEach(pointer.getPointsToSet()::addObject);
+        pointerFlowGraph.getSuccsOf(pointer)
+                        .forEach(succ -> workList.addEntry(succ, diff));
+
+        return diff;
     }
 
     /**
      * Processes instance calls when points-to set of the receiver variable changes.
      *
+     * “
      * @param var the variable that holds receiver objects
      * @param recv a new discovered object pointed by the variable.
      */
     private void processCall(Var var, Obj recv) {
         // TODO - finish me
+        
+        var.getInvokes().forEach(invoke -> {
+            JMethod callee = resolveCallee(recv, invoke);
+            if(callee == null) return;
+            boolean exists = callGraph.edgesOutOf(invoke)
+                    .anyMatch(edge -> edge.getCallee().equals(callee));
+            if(exists) return;
+            callGraph.addEdge(new Edge<>(CallKind.VIRTUAL, invoke, callee));
+
+            addReachable(callee);
+            List<Var> fval = callee.getIR().getParams();
+            List<Var> cval = invoke.getRValue().getArgs();
+            for(int i = 0; i < fval.size(); i++) {
+                addPFGEdge(pointerFlowGraph.getVarPtr(cval.get(i)),
+                        pointerFlowGraph.getVarPtr(fval.get(i)));
+            }
+            List<Var> rets = callee.getIR().getReturnVars();
+            if(invoke.getLValue() != null) {
+                rets.forEach(ret -> addPFGEdge(pointerFlowGraph.getVarPtr(ret),
+                        pointerFlowGraph.getVarPtr(invoke.getLValue())));
+            }
+            addPFGEdge(pointerFlowGraph.getVarPtr(var),
+                    pointerFlowGraph.getVarPtr(callee.getIR().getThis()));
+        });
     }
 
     /**
@@ -157,3 +239,18 @@ class Solver {
         return new CIPTAResult(pointerFlowGraph, callGraph);
     }
 }
+
+
+/*
+.\gradlew.bat test --tests pascal.taie.analysis.pta.CIPTATest --info
+.\gradlew.bat test --tests pascal.taie.analysis.pta.CIPTATest.testExample --info
+.\gradlew.bat test --tests pascal.taie.analysis.pta.CIPTATest.testArray --info
+.\gradlew.bat test --tests pascal.taie.analysis.pta.CIPTATest.testAssign --info
+.\gradlew.bat test --tests pascal.taie.analysis.pta.CIPTATest.testAssign2 --info
+.\gradlew.bat test --tests pascal.taie.analysis.pta.CIPTATest.testStoreLoad --info
+.\gradlew.bat test --tests pascal.taie.analysis.pta.CIPTATest.testCall --info
+.\gradlew.bat test --tests pascal.taie.analysis.pta.CIPTATest.testInstanceField --info
+.\gradlew.bat test --tests pascal.taie.analysis.pta.CIPTATest.testStaticField --info
+.\gradlew.bat test --tests pascal.taie.analysis.pta.CIPTATest.testStaticCall --info
+.\gradlew.bat test --tests pascal.taie.analysis.pta.CIPTATest.testMergeParam --info
+ */
